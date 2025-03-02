@@ -37,16 +37,16 @@ void reportAttribute(uint8_t endpoint, uint16_t clusterID, uint16_t attributeID,
     esp_zb_zcl_report_attr_cmd_req(&cmd);
 }
 
-void temp_task(void *pvParameters)
+static void temp_task(void *pvParameters)
 {
     while (1)
     {
         if(booted){
             test_temp = test_temp + 100;
-            // ESP_LOGI(TAG, "Set new termperature %d", test_temp);
+            ESP_LOGI(TAG, "Set new termperature %d", test_temp);
             reportAttribute(HA_ESP_LIGHT_ENDPOINT, ESP_ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT, ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID, &test_temp, 2);
         } else{
-            // ESP_LOGI(TAG, "Device not booted yet");
+            ESP_LOGI(TAG, "Device not booted yet");
         }
         vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
@@ -226,7 +226,7 @@ void app_main(void)
     /* load Zigbee light_bulb platform config to initialization */
     ESP_ERROR_CHECK(esp_zb_platform_config(&config));
     /* hardware related and device init */
-    //xTaskCreate(temp_task, "temp_task", 1024, NULL, 5, NULL);
+    xTaskCreate(temp_task, "temp_task", 4096, NULL, 5, NULL);
 
     xTaskCreate(esp_zb_task, "Zigbee_main", 4096, NULL, 5, NULL);
 
