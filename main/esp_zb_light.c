@@ -74,7 +74,7 @@ static esp_err_t zb_attribute_handler(const esp_zb_zcl_set_attr_value_message_t 
             if (message->attribute.id == ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID && message->attribute.data.type == ESP_ZB_ZCL_ATTR_TYPE_BOOL)
             {
                 light_state = message->attribute.data.value ? *(bool *)message->attribute.data.value : light_state;
-                gpio_set_level(GPIO_NUM_15, light_state);
+                gpio_set_level(GPIO_NUM_15, !light_state);
                 ESP_LOGI(TAG, "Light sets to %s", light_state ? "On" : "Off");
             }
         }
