@@ -26,15 +26,22 @@ static void temp_task(void *pvParameters)
     {
         if(booted){
 
-            uint16_t temp = (uint16_t)(get_temp()*100.);
+            float temp = get_temp();
 
-            ESP_LOGI(TAG, "Set new termperature %d", temp);
+            // roughly keep temp at 25c
+            if(temp < 25){
+                gpio_set_level(GPIO_NUM_1, 1);
+            } else{
+                gpio_set_level(GPIO_NUM_1, 0);
+            }
+
+            uint16_t temp_zb = (uint16_t)(temp*100.);
             esp_zb_zcl_set_attribute_val(
                 HA_ESP_LIGHT_ENDPOINT, //
                 ESP_ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT, 
                 ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, 
                 ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID, 
-                &temp, 
+                &temp_zb, 
                 false
             );
         } else{
@@ -231,6 +238,10 @@ void app_main(void)
     // setup onboard led
     gpio_set_direction(GPIO_NUM_15, GPIO_MODE_OUTPUT);
     gpio_set_level(GPIO_NUM_15, 0);
+
+    // setup heater gpio
+    gpio_set_direction(GPIO_NUM_1, GPIO_MODE_OUTPUT);
+    gpio_set_level(GPIO_NUM_1, 0);
 
     // setup temperature sensor
     init_temp_sensor();
