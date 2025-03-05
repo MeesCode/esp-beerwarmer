@@ -27,7 +27,7 @@ const float temp_offset = 0.5;
 void report_output_binary_sensor(uint16_t value)
 {
     esp_zb_zcl_set_attribute_val(
-        HA_ESP_ENDPOINT, //
+        HA_ESP_ENDPOINT,
         ESP_ZB_ZCL_CLUSTER_ID_BINARY_INPUT, 
         ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, 
         ESP_ZB_ZCL_ATTR_BINARY_INPUT_PRESENT_VALUE_ID, 
@@ -40,7 +40,7 @@ void report_temperature(float temp)
 {
     uint16_t temp_zb = (uint16_t)(temp*100.);
     esp_zb_zcl_set_attribute_val(
-        HA_ESP_ENDPOINT, //
+        HA_ESP_ENDPOINT, 
         ESP_ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT, 
         ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, 
         ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID, 
@@ -240,7 +240,12 @@ static void esp_zb_task(void *pvParameters)
         .cluster_id = ESP_ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT,
         .cluster_role = ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
         .dst.profile_id = ESP_ZB_AF_HA_PROFILE_ID,
+        .u.send_info.min_interval = 1,
         .u.send_info.max_interval = 0,
+        .u.send_info.def_min_interval = 1,
+        .u.send_info.def_max_interval = 0,
+        .u.send_info.delta.u16 = 5,
+        .u.send_info.reported_value.u16 = 0,
         .attr_id = ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID,
         .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
     };
@@ -254,6 +259,11 @@ static void esp_zb_task(void *pvParameters)
         .cluster_role = ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
         .dst.profile_id = ESP_ZB_AF_HA_PROFILE_ID,
         .u.send_info.min_interval = 1,
+        .u.send_info.max_interval = 0,
+        .u.send_info.def_min_interval = 1,
+        .u.send_info.def_max_interval = 0,
+        .u.send_info.delta.u16 = 1,
+        .u.send_info.reported_value.u8 = 0,
         .attr_id = ESP_ZB_ZCL_ATTR_BINARY_INPUT_PRESENT_VALUE_ID,
         .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
     };
