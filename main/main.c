@@ -4,13 +4,14 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "ha/esp_zigbee_ha_standard.h"
-#include "esp_zb_light.h"
+#include "main.h"
 #include "string.h"
 #include "driver/gpio.h"
+#include "temp_sensor.h"
 
-static const char *TAG = "BEERWARMER";
-uint16_t test_temp = 0;
-uint8_t booted = 0;
+static const char *TAG = "MAIN";
+bool booted = false;
+bool light_state = false;
 
 #define DEFINE_PSTRING(var, str)   \
     const struct                   \
@@ -25,31 +26,22 @@ static void temp_task(void *pvParameters)
     {
         if(booted){
 
-            // simulate temperature change
-            if(test_temp >= 20000){
-                test_temp -= 10;
-            } else if(test_temp <= 0){
-                test_temp += 10;
-            } else if((rand() % 2) == 0){
-                test_temp -= 10;
-            } else{
-                test_temp += 10;
-            }
+            uint16_t temp = (uint16_t)(get_temp()*100.);
 
-            ESP_LOGI(TAG, "Set new termperature %d", test_temp);
+            ESP_LOGI(TAG, "Set new termperature %d", temp);
             esp_zb_zcl_set_attribute_val(
                 HA_ESP_LIGHT_ENDPOINT, //
                 ESP_ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT, 
                 ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, 
                 ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID, 
-                &test_temp, 
+                &temp, 
                 false
             );
         } else{
             ESP_LOGI(TAG, "Device not booted yet");
         }
         
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -61,7 +53,6 @@ static void bdb_start_top_level_commissioning_cb(uint8_t mode_mask)
 static esp_err_t zb_attribute_handler(const esp_zb_zcl_set_attr_value_message_t *message)
 {
     esp_err_t ret = ESP_OK;
-    bool light_state = 0;
     ESP_RETURN_ON_FALSE(message, ESP_FAIL, TAG, "Empty message");
     ESP_RETURN_ON_FALSE(message->info.status == ESP_ZB_ZCL_STATUS_SUCCESS, ESP_ERR_INVALID_ARG, TAG, "Received message: error status(%d)",
                         message->info.status);
@@ -116,7 +107,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
                 esp_zb_bdb_start_top_level_commissioning(ESP_ZB_BDB_MODE_NETWORK_STEERING);
             } else {
                 ESP_LOGI(TAG, "Device rebooted");
-                booted = 1;
+                booted = true;
             }
         } else {
             ESP_LOGW(TAG, "%s failed with status: %s, retrying", esp_zb_zdo_signal_to_string(sig_type),
@@ -184,11 +175,11 @@ static void esp_zb_task(void *pvParameters)
     };
     esp_zb_attribute_list_t *esp_zb_on_off_cluster = esp_zb_on_off_cluster_create(&on_off_cfg);
 
-    // cluster temperature measurement
+    // cluster temperature measurement (0 to 30 degree celsius)
     esp_zb_temperature_meas_cluster_cfg_t temperature_meas_cfg = {
         .measured_value = 0xFFFF,
-        .min_value = -32000,
-        .max_value = 32000,
+        .min_value = 0,
+        .max_value = 3000,
     };
     esp_zb_attribute_list_t *esp_zb_temperature_meas_cluster = esp_zb_temperature_meas_cluster_create(&temperature_meas_cfg);
 
@@ -223,7 +214,7 @@ static void esp_zb_task(void *pvParameters)
         .u.send_info.max_interval = 0,
         .u.send_info.def_min_interval = 1,
         .u.send_info.def_max_interval = 0,
-        .u.send_info.delta.u16 = 100,
+        .u.send_info.delta.u16 = 10,
         .attr_id = ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID,
         .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
     };
@@ -232,13 +223,17 @@ static void esp_zb_task(void *pvParameters)
     // start zigbee
     esp_zb_set_primary_network_channel_set(ESP_ZB_PRIMARY_CHANNEL_MASK);
     ESP_ERROR_CHECK(esp_zb_start(false));
-    esp_zb_main_loop_iteration();
+    esp_zb_stack_main_loop();
 }
 
 void app_main(void)
 {
     // setup onboard led
     gpio_set_direction(GPIO_NUM_15, GPIO_MODE_OUTPUT);
+    gpio_set_level(GPIO_NUM_15, 0);
+
+    // setup temperature sensor
+    init_temp_sensor();
 
     // use internal antenna
     gpio_set_direction(GPIO_NUM_3, GPIO_MODE_OUTPUT);
