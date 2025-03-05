@@ -11,10 +11,10 @@
 
 static const char *TAG = "MAIN";
 bool zb_connected = false;
-bool switch_state = false;
+bool switch_state = true;
 
 const float target_temp = 30.0;
-const float temp_offset = 0.5;
+const float temp_offset = 0.2;
 
 #define DEFINE_PSTRING(var, str)   \
     const struct                   \
@@ -173,7 +173,7 @@ static void esp_zb_task(void *pvParameters)
     uint32_t ApplicationVersion = 0x0001;
     uint32_t StackVersion = 0x0002;
     uint32_t HWVersion = 0x0002;
-    DEFINE_PSTRING(ManufacturerName, "Seeed Studio Xiao C6");
+    DEFINE_PSTRING(ManufacturerName, "Mees C6");
     DEFINE_PSTRING(ModelIdentifier, "Beer warmer");
     DEFINE_PSTRING(DateCode, "20250303");
 
@@ -245,7 +245,7 @@ static void esp_zb_task(void *pvParameters)
         .u.send_info.max_interval = 0,
         .u.send_info.def_min_interval = 1,
         .u.send_info.def_max_interval = 0,
-        .u.send_info.delta.u16 = 10,
+        .u.send_info.delta.u16 = 1,
         .u.send_info.reported_value.u16 = 0,
         .attr_id = ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID,
         .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
@@ -263,7 +263,7 @@ static void esp_zb_task(void *pvParameters)
         .u.send_info.max_interval = 0,
         .u.send_info.def_min_interval = 1,
         .u.send_info.def_max_interval = 0,
-        .u.send_info.delta.u16 = 1,
+        .u.send_info.delta.u8 = 1,
         .u.send_info.reported_value.u8 = 0,
         .attr_id = ESP_ZB_ZCL_ATTR_BINARY_INPUT_PRESENT_VALUE_ID,
         .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
@@ -280,7 +280,7 @@ void app_main(void)
 {
     // setup onboard led
     gpio_set_direction(GPIO_NUM_15, GPIO_MODE_OUTPUT);
-    gpio_set_level(GPIO_NUM_15, 1);
+    gpio_set_level(GPIO_NUM_15, 0);
 
     // setup heater gpio
     gpio_set_direction(GPIO_NUM_1, GPIO_MODE_OUTPUT);
