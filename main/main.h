@@ -26,3 +26,14 @@
     {                                                      \
         .host_connection_mode = ZB_HOST_CONNECTION_MODE_NONE, \
     }
+
+
+#define TEST_LCD_V_RES          64
+#define TEST_LCD_H_RES          128
+
+#define TEST_I2C_SDA_GPIO       22
+#define TEST_I2C_SCL_GPIO       23
+
+#define TEST_I2C_DEV_ADDR       0x3C
+
+#define TEST_LCD_PIXEL_CLOCK_HZ (400 * 1000)

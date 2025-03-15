@@ -9,6 +9,15 @@
 #include "driver/gpio.h"
 #include "temp_sensor.h"
 
+#include "driver/i2c_master.h"
+#include "esp_lcd_panel_io.h"
+#include "esp_lcd_panel_vendor.h"
+#include "esp_lcd_panel_ops.h"
+
+#include "oled_gfx.h"
+
+#define HEATER_PIN GPIO_NUM_1
+
 static const char *TAG = "MAIN";
 bool zb_connected = false;
 bool switch_state = true;
@@ -52,20 +61,27 @@ void report_temperature(float temp)
 static void temp_task(void *pvParameters)
 {
     for(;;){
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        vTaskDelay(250 / portTICK_PERIOD_MS);
 
         if(!zb_connected) continue;
 
         float temp = get_temp();
+
+        char temp_str[10];
+        sprintf(temp_str, "%.2f", temp);
+        gfx_draw_text(0, 25, temp_str);
+
         report_temperature(temp);
 
         // roughly keep temp at 25c by turning on/off the heater
         if(temp < target_temp - temp_offset && switch_state){
-            gpio_set_level(GPIO_NUM_1, 1);
+            gpio_set_level(HEATER_PIN, 1);
             report_output_binary_sensor(1);
+            gfx_draw_text(0, 40, "heat on ");
         } else if(temp > target_temp + temp_offset || !switch_state){
-            gpio_set_level(GPIO_NUM_1, 0);
+            gpio_set_level(HEATER_PIN, 0);
             report_output_binary_sensor(0);
+            gfx_draw_text(0, 40, "heat off");
         }
     }
 }
@@ -281,8 +297,8 @@ void app_main(void)
     gpio_set_level(GPIO_NUM_15, 0);
 
     // setup heater gpio
-    gpio_set_direction(GPIO_NUM_1, GPIO_MODE_OUTPUT);
-    gpio_set_level(GPIO_NUM_1, 0);
+    gpio_set_direction(HEATER_PIN, GPIO_MODE_OUTPUT);
+    gpio_set_level(HEATER_PIN, 0);
 
     // setup temperature sensor
     init_temp_sensor();
@@ -300,6 +316,64 @@ void app_main(void)
     };
     ESP_ERROR_CHECK(nvs_flash_init());
     ESP_ERROR_CHECK(esp_zb_platform_config(&config));
+
+    i2c_master_bus_config_t i2c_bus_conf = {
+        .clk_source = I2C_CLK_SRC_DEFAULT,
+        .sda_io_num = TEST_I2C_SDA_GPIO,
+        .scl_io_num = TEST_I2C_SCL_GPIO,
+        .i2c_port = I2C_NUM_0,
+        .flags.enable_internal_pullup = true,
+    };
+
+    i2c_master_bus_handle_t bus_handle;
+    i2c_new_master_bus(&i2c_bus_conf, &bus_handle);
+
+    esp_lcd_panel_io_handle_t io_handle = NULL;
+    esp_lcd_panel_io_i2c_config_t io_config = {
+        .dev_addr = TEST_I2C_DEV_ADDR,
+        .scl_speed_hz = TEST_LCD_PIXEL_CLOCK_HZ,
+        .control_phase_bytes = 1, // According to SSD1306 datasheet
+        .dc_bit_offset = 6,       // According to SSD1306 datasheet
+        .lcd_cmd_bits = 8,        // According to SSD1306 datasheet
+        .lcd_param_bits = 8,      // According to SSD1306 datasheet
+    };
+
+    esp_lcd_new_panel_io_i2c(bus_handle, &io_config, &io_handle);
+
+    esp_lcd_panel_handle_t panel_handle = NULL;
+    esp_lcd_panel_dev_config_t panel_config = {
+        .bits_per_pixel = 1,
+        .reset_gpio_num = -1,
+    };
+    esp_lcd_new_panel_ssd1306(io_handle, &panel_config, &panel_handle);
+    esp_lcd_panel_reset(panel_handle);
+    esp_lcd_panel_init(panel_handle);
+    // turn on display
+    esp_lcd_panel_disp_on_off(panel_handle, true);
+
+    // mirror the display
+    esp_lcd_panel_mirror(panel_handle, true, true);
+
+    
+
+    gfx_init(panel_handle, TEST_LCD_H_RES, TEST_LCD_V_RES);
+    // gfx_draw_bitmap(32, 0, 8, 8, font8x8_basic['Z']);
+
+    for (int i = 0; i < TEST_LCD_V_RES / 8; i++) {
+        gfx_draw_text(0, i * 8, "                ");
+    }
+
+    // gfx_draw_text(0,0, "A");
+    // gfx_draw_text(TEST_LCD_H_RES-8,0, "B");
+    // gfx_draw_text(0,TEST_LCD_V_RES-8, "C");
+    // gfx_draw_text(TEST_LCD_H_RES-8,TEST_LCD_V_RES-8, "D");
+
+    // display hello world
+    gfx_draw_text(0, 10, "Beer warmer");
+
+    // esp_lcd_panel_del(panel_handle);
+    // esp_lcd_panel_io_del(io_handle);
+    // i2c_del_master_bus(bus_handle);
 
     // task for keeping track of temperature
     xTaskCreate(temp_task, "temp_task", 4096, NULL, 5, NULL);
