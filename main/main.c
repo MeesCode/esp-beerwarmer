@@ -25,6 +25,9 @@ bool switch_state = true;
 const float target_temp = 22.0;
 const float temp_offset = 0.1;
 
+float temps[120] = {0.0f};
+int temp_index = 0;
+
 #define DEFINE_PSTRING(var, str)   \
     const struct                   \
     {                              \
@@ -58,6 +61,37 @@ void report_temperature(float temp)
     );
 }
 
+void draw_graph()
+{
+    gfx_clear_area(0, 16, 128, 48);
+    float max_temp = 0;
+    float min_temp = 100;
+    for(int i = 0; i < 120; i++){
+        if(temps[i] > max_temp) max_temp = temps[i] + 0.5;
+        if(temps[i] < min_temp && temps[i] != 0) min_temp = temps[i] - 0.5;
+    }
+
+    ESP_LOGI(TAG, "max_temp: %f, min_temp: %f", max_temp, min_temp);
+
+    // height of drawing area is 48
+    // draw a point between min and max temp
+    // on the bottom 48 pixels
+    for(int i = 0; i < 120; i++){
+        int x = i;
+        int index = (temp_index + i + 1) % 120;
+
+        int delta = max_temp - min_temp;
+        if(delta == 0) delta = 1;
+        int offset = (temps[index] - min_temp);
+        if (offset <= 0) offset = 1;
+        int y = (float)delta / (48.0 * (float)offset);
+
+        ESP_LOGI(TAG, "x: %d, y: %d", x, y);
+        gfx_fill_area(x + 4, 64 - y, 1, y);
+    }
+    
+}
+
 static void temp_task(void *pvParameters)
 {
     for(;;){
@@ -68,8 +102,12 @@ static void temp_task(void *pvParameters)
         float temp = get_temp();
 
         char temp_str[10];
-        sprintf(temp_str, "%.2f", temp);
-        gfx_draw_text(0, 25, temp_str);
+        sprintf(temp_str, "%.2f C", temp);
+        gfx_draw_text(0, 10, temp_str);
+
+        temps[temp_index] = temp;
+        temp_index = (temp_index + 1) % 120;
+        //draw_graph();
 
         report_temperature(temp);
 
@@ -77,11 +115,11 @@ static void temp_task(void *pvParameters)
         if(temp < target_temp - temp_offset && switch_state){
             gpio_set_level(HEATER_PIN, 1);
             report_output_binary_sensor(1);
-            gfx_draw_text(0, 40, "heat on ");
+            gfx_draw_text(0, 20, "heat on ");
         } else if(temp > target_temp + temp_offset || !switch_state){
             gpio_set_level(HEATER_PIN, 0);
             report_output_binary_sensor(0);
-            gfx_draw_text(0, 40, "heat off");
+            gfx_draw_text(0, 20, "heat off");
         }
     }
 }
@@ -357,27 +395,25 @@ void app_main(void)
     
 
     gfx_init(panel_handle, TEST_LCD_H_RES, TEST_LCD_V_RES);
-    // gfx_draw_bitmap(32, 0, 8, 8, font8x8_basic['Z']);
 
-    for (int i = 0; i < TEST_LCD_V_RES / 8; i++) {
-        gfx_draw_text(0, i * 8, "                ");
+    gfx_clear_area(0, 0, 128, 64);
+    gfx_draw_text(0, 0, "Beer warmer");
+
+    gfx_fill_area(20, 40, 8, 8);
+
+    gfx_fill_area(100, 40, 5, 1);
+
+    for(int y = 0; y < 64; y++){
+        for(int x = 0; x < 128; x++){
+            gfx_set_pixel(x, y);
+            gfx_flush();
+        }
     }
+    
 
-    // gfx_draw_text(0,0, "A");
-    // gfx_draw_text(TEST_LCD_H_RES-8,0, "B");
-    // gfx_draw_text(0,TEST_LCD_V_RES-8, "C");
-    // gfx_draw_text(TEST_LCD_H_RES-8,TEST_LCD_V_RES-8, "D");
+    // // task for keeping track of temperature
+    // xTaskCreate(temp_task, "temp_task", 4096, NULL, 5, NULL);
 
-    // display hello world
-    gfx_draw_text(0, 10, "Beer warmer");
-
-    // esp_lcd_panel_del(panel_handle);
-    // esp_lcd_panel_io_del(io_handle);
-    // i2c_del_master_bus(bus_handle);
-
-    // task for keeping track of temperature
-    xTaskCreate(temp_task, "temp_task", 4096, NULL, 5, NULL);
-
-    // task for zigbee
-    xTaskCreate(esp_zb_task, "Zigbee_main", 4096, NULL, 5, NULL);
+    // // task for zigbee
+    // xTaskCreate(esp_zb_task, "Zigbee_main", 4096, NULL, 5, NULL);
 }
