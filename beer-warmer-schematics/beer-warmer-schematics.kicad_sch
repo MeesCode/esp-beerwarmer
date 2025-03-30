@@ -4507,12 +4507,6 @@
 		(uuid "3e9e92e4-7a7c-41f2-8809-a3303ed5d2ef")
 	)
 	(junction
-		(at 83.82 160.02)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "5773cda4-4645-4d93-a881-fb4c947c6109")
-	)
-	(junction
 		(at 41.91 30.48)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -5652,73 +5646,6 @@
 		)
 	)
 	(symbol
-		(lib_id "Connector:TestPoint")
-		(at 83.82 160.02 270)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(uuid "060b5f98-ea26-44d2-9a5f-ddd0d63a0d8a")
-		(property "Reference" "TP3"
-			(at 88.9 160.02 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-			)
-		)
-		(property "Value" "TestPoint"
-			(at 88.9 161.2899 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-				(hide yes)
-			)
-		)
-		(property "Footprint" "TestPoint:TestPoint_Pad_D1.0mm"
-			(at 83.82 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 83.82 165.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "test point"
-			(at 83.82 160.02 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "e605f30a-b95d-4eb9-ab41-ce59624d31fc")
-		)
-		(instances
-			(project ""
-				(path "/70572ac2-8723-48b8-abb1-12d225a3bb68"
-					(reference "TP3")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "power:GND")
 		(at 143.51 100.33 270)
 		(unit 1)
@@ -5919,7 +5846,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
+		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3_DIN965_Pad"
 			(at 208.28 111.76 0)
 			(effects
 				(font
@@ -8283,7 +8210,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
+		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3_DIN965_Pad"
 			(at 208.28 105.41 0)
 			(effects
 				(font
@@ -8424,7 +8351,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
+		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3_DIN965_Pad"
 			(at 208.28 92.71 0)
 			(effects
 				(font
@@ -8488,7 +8415,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3"
+		(property "Footprint" "MountingHole:MountingHole_3.2mm_M3_DIN965_Pad"
 			(at 208.28 99.06 0)
 			(effects
 				(font
