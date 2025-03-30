@@ -341,7 +341,7 @@
 		)
 	)
 	(embedded_fonts no)
-	(model "${KIPRJMOD}/SRR1280_330M/IND_BOURNS_SRR1280.step"
+	(model "${KIPRJMOD}/3d models/IND_BOURNS_SRR1280.step"
 		(offset
 			(xyz 0 0 0)
 		)

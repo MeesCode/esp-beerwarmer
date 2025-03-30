@@ -429,20 +429,20 @@
 		)
 		(polygon
 			(pts
-				(xy 3.5 4.325) (xy -3.5 4.325) (xy -3.5 -1.305) (xy 3.5 -1.305)
+				(xy 3.5 4.325) (xy -3.5 4.325) (xy -3.5 -0.805) (xy 3.5 -0.805)
 			)
 		)
 	)
 	(embedded_fonts no)
 	(model "${KIPRJMOD}/3d models/1054500101.stp"
 		(offset
-			(xyz 0 0 1.8)
+			(xyz 0 0.2 1.8)
 		)
 		(scale
 			(xyz 1 1 1)
 		)
 		(rotate
-			(xyz -0 -0 -0)
+			(xyz -0 -0 -180)
 		)
 	)
 )
