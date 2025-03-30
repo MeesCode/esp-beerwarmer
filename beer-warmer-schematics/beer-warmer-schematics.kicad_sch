@@ -6264,7 +6264,7 @@
 		(at 93.98 35.56 0)
 		(unit 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(dnp no)
 		(uuid "2d9300fe-5c28-4f82-9658-acf76ad7619f")
@@ -6331,7 +6331,7 @@
 		(at 77.47 74.93 0)
 		(unit 1)
 		(exclude_from_sim no)
-		(in_bom yes)
+		(in_bom no)
 		(on_board yes)
 		(dnp no)
 		(uuid "37d01095-2831-4c68-9a2a-74475f019204")
@@ -7858,7 +7858,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-2_1x02_P5.00mm_Horizontal"
+		(property "Footprint" "TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-2-5.08_1x02_P5.08mm_Horizontal"
 			(at 88.9 149.86 0)
 			(effects
 				(font
@@ -7885,7 +7885,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C128027"
+		(property "LCSC" "C8465"
 			(at 88.9 149.86 0)
 			(effects
 				(font
@@ -8128,7 +8128,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-3_1x03_P5.00mm_Horizontal"
+		(property "Footprint" "TerminalBlock_Phoenix:TerminalBlock_Phoenix_MKDS-1,5-3-5.08_1x03_P5.08mm_Horizontal"
 			(at 158.75 102.87 0)
 			(effects
 				(font
@@ -8155,7 +8155,7 @@
 				(hide yes)
 			)
 		)
-		(property "LCSC" "C128026"
+		(property "LCSC" "C72334"
 			(at 158.75 102.87 0)
 			(effects
 				(font
