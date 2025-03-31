@@ -33,3 +33,4 @@ fp-info-cache
 production/
 beer-warmer-schematics-backups/
 _autosave-beer-warmer-schematics.kicad_pcb
+*.lck
