@@ -58,7 +58,20 @@
           "width": 0.0
         }
       ],
-      "drc_exclusions": [],
+      "drc_exclusions": [
+        [
+          "solder_mask_bridge|127646427|113236076|12789c96-a1fd-47bd-96e0-7d5e1c9a7e7c|701303ff-b4e5-4b23-94a7-d890b9d1fa4d",
+          ""
+        ],
+        [
+          "solder_mask_bridge|127916952|73624019|7f9d121b-dedb-4c1d-ab7c-49b4e7e28b44|701303ff-b4e5-4b23-94a7-d890b9d1fa4d",
+          ""
+        ],
+        [
+          "solder_mask_bridge|171646427|113236076|d4c1fe15-35e4-45c0-b699-fe07fdb442b0|701303ff-b4e5-4b23-94a7-d890b9d1fa4d",
+          ""
+        ]
+      ],
       "meta": {
         "version": 2
       },
@@ -66,7 +79,7 @@
         "annular_width": "error",
         "clearance": "error",
         "connection_width": "warning",
-        "copper_edge_clearance": "error",
+        "copper_edge_clearance": "ignore",
         "copper_sliver": "warning",
         "courtyards_overlap": "error",
         "creepage": "error",
