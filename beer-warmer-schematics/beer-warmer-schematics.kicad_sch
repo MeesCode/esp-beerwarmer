@@ -4507,6 +4507,12 @@
 		(uuid "3e9e92e4-7a7c-41f2-8809-a3303ed5d2ef")
 	)
 	(junction
+		(at 208.28 40.64)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "55923307-1c38-44de-b633-d6b6337c32a0")
+	)
+	(junction
 		(at 41.91 30.48)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -4605,10 +4611,6 @@
 	(no_connect
 		(at 158.75 40.64)
 		(uuid "dc8b072e-fbd4-4d72-90f4-3f1c7580f1dc")
-	)
-	(no_connect
-		(at 201.93 40.64)
-		(uuid "dfab350d-1108-4b4f-8c69-e6353afb4859")
 	)
 	(no_connect
 		(at 158.75 43.18)
@@ -4716,6 +4718,16 @@
 	)
 	(wire
 		(pts
+			(xy 208.28 57.15) (xy 215.9 57.15)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "1df0eba2-bafc-46b9-ad21-e5ea59218864")
+	)
+	(wire
+		(pts
 			(xy 92.71 30.48) (xy 92.71 35.56)
 		)
 		(stroke
@@ -4743,6 +4755,16 @@
 			(type default)
 		)
 		(uuid "2f04df17-f224-4950-833b-516a1583308c")
+	)
+	(wire
+		(pts
+			(xy 208.28 40.64) (xy 210.82 40.64)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "3720edd6-d1df-4316-b5d8-74e1b4e2f858")
 	)
 	(wire
 		(pts
@@ -4876,6 +4898,16 @@
 	)
 	(wire
 		(pts
+			(xy 208.28 40.64) (xy 208.28 57.15)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "61028d9b-ee68-48be-a0d1-9986adfb54d9")
+	)
+	(wire
+		(pts
 			(xy 54.61 157.48) (xy 54.61 167.64)
 		)
 		(stroke
@@ -4973,16 +5005,6 @@
 			(type default)
 		)
 		(uuid "7c49b3b9-bd95-443c-be55-db7d9bf75b23")
-	)
-	(wire
-		(pts
-			(xy 193.04 40.64) (xy 210.82 40.64)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "7e4d7824-8062-4221-8aaa-2146af919e6c")
 	)
 	(wire
 		(pts
@@ -5324,6 +5346,16 @@
 		)
 		(uuid "fa229629-475e-4412-bbb9-4f5d8fa2dbdc")
 	)
+	(wire
+		(pts
+			(xy 193.04 40.64) (xy 208.28 40.64)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "ff5cf71b-0467-4935-9669-bd60fbb93321")
+	)
 	(global_label "D0"
 		(shape input)
 		(at 143.51 105.41 180)
@@ -5408,6 +5440,28 @@
 					(size 1.27 1.27)
 				)
 				(justify left)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "D3"
+		(shape input)
+		(at 208.28 57.15 180)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify right)
+		)
+		(uuid "254d513a-d26b-46ee-9873-c9343624f601")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 202.8153 57.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
 				(hide yes)
 			)
 		)
@@ -6327,6 +6381,82 @@
 		)
 	)
 	(symbol
+		(lib_id "Device:R")
+		(at 219.71 57.15 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "32092702-0604-4905-b31a-0da480f82f56")
+		(property "Reference" "R6"
+			(at 219.71 63.5 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "200R"
+			(at 219.71 60.96 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 219.71 58.928 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 219.71 57.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Resistor"
+			(at 219.71 57.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C8218"
+			(at 219.71 57.15 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "bae9f780-c819-45b2-8950-e337d9ce108c")
+		)
+		(pin "2"
+			(uuid "853b6b59-ea36-4e08-8e63-a1ee91a1d2cb")
+		)
+		(instances
+			(project "beer-warmer-schematics"
+				(path "/70572ac2-8723-48b8-abb1-12d225a3bb68"
+					(reference "R6")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Connector:TestPoint")
 		(at 77.47 74.93 0)
 		(unit 1)
@@ -6739,6 +6869,91 @@
 			(project "beer-warmer-schematics"
 				(path "/70572ac2-8723-48b8-abb1-12d225a3bb68"
 					(reference "R3")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "Device:LED")
+		(at 227.33 57.15 180)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "4f7c4140-dd26-456b-9499-800aa94b6c38")
+		(property "Reference" "D3"
+			(at 231.14 63.5 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "Red LED"
+			(at 231.14 60.96 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "Resistor_SMD:R_0201_0603Metric"
+			(at 227.33 57.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 227.33 57.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Light emitting diode"
+			(at 227.33 57.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Sim.Pins" "1=K 2=A"
+			(at 227.33 57.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "LCSC" "C2286"
+			(at 227.33 57.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "79f51deb-7d5a-4d00-99d3-dfc16f7cb897")
+		)
+		(pin "2"
+			(uuid "16bc562d-ed51-4e86-91cf-0a3fb3aa4274")
+		)
+		(instances
+			(project "beer-warmer-schematics"
+				(path "/70572ac2-8723-48b8-abb1-12d225a3bb68"
+					(reference "D3")
 					(unit 1)
 				)
 			)
@@ -9558,6 +9773,73 @@
 			(project ""
 				(path "/70572ac2-8723-48b8-abb1-12d225a3bb68"
 					(reference "#PWR07")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:GND")
+		(at 231.14 57.15 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "f4447716-fc23-478e-a821-f63a37d0cfd5")
+		(property "Reference" "#PWR026"
+			(at 237.49 57.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "GND"
+			(at 234.95 57.1501 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" ""
+			(at 231.14 57.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 231.14 57.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Power symbol creates a global label with name \"GND\" , ground"
+			(at 231.14 57.15 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "3333e3ab-3b37-4c13-bb19-1a947d8e5628")
+		)
+		(instances
+			(project "beer-warmer-schematics"
+				(path "/70572ac2-8723-48b8-abb1-12d225a3bb68"
+					(reference "#PWR026")
 					(unit 1)
 				)
 			)
