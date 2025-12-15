@@ -44,8 +44,6 @@ void init_temp_sensor(){
     } while (search_result != ESP_ERR_NOT_FOUND);
     ESP_ERROR_CHECK(onewire_del_device_iter(iter));
     ESP_LOGI(TAG, "Searching done, %d DS18B20 device(s) found", ds18b20_device_num);
-
-    // Now you have the DS18B20 sensor handle, you can use it to read the temperature
 }
 
 float get_temp(){

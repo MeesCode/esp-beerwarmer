@@ -15,6 +15,7 @@
 #include "esp_lcd_panel_ops.h"
 
 #include "oled_gfx.h"
+#include "driver/i2c_master.h"
 
 #define HEATER_PIN GPIO_NUM_1
 
@@ -27,6 +28,115 @@ const float temp_offset = 0.1;
 
 float temps[128] = {-1.0f};
 int temp_index = 0;
+
+i2c_master_bus_handle_t bus_handle;
+i2c_master_dev_handle_t ina219_dev_handle = NULL;
+
+// --- I2C Master Configuration ---
+#define I2C_MASTER_SDA_IO           21      // Example GPIO for SDA (change as needed)
+#define I2C_MASTER_SCL_IO           22      // Example GPIO for SCL (change as needed)
+#define I2C_MASTER_NUM              I2C_NUM_0
+#define I2C_MASTER_FREQ_HZ          100000  // 100 kHz standard speed
+
+// --- I2C/INA219 Constants ---
+#define INA219_ADDR             0x40
+#define REG_CONFIG              0x00
+#define REG_CALIBRATION         0x05
+#define REG_CURRENT             0x04
+
+// Configuration & Calibration Values for 2A Max, 20mOhm Shunt
+#define INA219_CONFIG_WORD      0x01FF  // 32V Bus, +/-40mV Gain, 12-bit res, Continuous
+#define INA219_CAL_VALUE        0x7FF8  // 32760 decimal
+#define LSB_CURRENT_A           0.00006257f // 62.57 uA LSB
+
+/**
+ * @brief Writes a 16-bit value to an INA219 register.
+ * @param reg_addr Register address (0x00 to 0x05).
+ * @param value 16-bit data to write (MSB first).
+ */
+esp_err_t ina219_write_reg(uint8_t reg_addr, uint16_t value)
+{
+    // The INA219 expects the register address (1 byte) followed by 
+    // the 16-bit value, MSB first (2 bytes). Total 3 bytes.
+    uint8_t write_buffer[3] = {
+        reg_addr, 
+        (uint8_t)(value >> 8),  // MSB
+        (uint8_t)(value & 0xFF) // LSB
+    };
+    
+    // i2c_master_transmit() sends the entire buffer to the device.
+    return i2c_master_transmit(ina219_dev_handle, write_buffer, sizeof(write_buffer), -1);
+}
+
+/**
+ * @brief Reads a 16-bit value from an INA219 register.
+ * @param reg_addr Register address (0x01 to 0x04).
+ * @param raw_value Pointer to store the raw 16-bit data.
+ */
+esp_err_t ina219_read_reg(uint8_t reg_addr, uint16_t *raw_value)
+{
+    uint8_t read_buffer[2];
+    esp_err_t ret;
+
+    // i2c_master_transmit_receive: First writes the register address (1 byte) 
+    // then reads the 16-bit result (2 bytes).
+    ret = i2c_master_transmit_receive(ina219_dev_handle, &reg_addr, 1, read_buffer, 2, -1);
+    
+    if (ret == ESP_OK) {
+        // Combine the two bytes (MSB first) into a 16-bit value
+        *raw_value = (read_buffer[0] << 8) | read_buffer[1];
+    }
+    return ret;
+}
+
+/**
+ * @brief Initializes and configures the INA219 sensor.
+ */
+esp_err_t ina219_init_and_calibrate()
+{
+    esp_err_t ret;
+
+    // 1. Write Calibration Register
+    ESP_LOGI(TAG, "Writing Calibration Register (0x%04X)...", INA219_CAL_VALUE);
+    ret = ina219_write_reg(REG_CALIBRATION, INA219_CAL_VALUE);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Calibration failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    // 2. Write Configuration Register
+    ESP_LOGI(TAG, "Writing Configuration Register (0x%04X)...", INA219_CONFIG_WORD);
+    ret = ina219_write_reg(REG_CONFIG, INA219_CONFIG_WORD);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Configuration failed: %s", esp_err_to_name(ret));
+    }
+    
+    return ret;
+}
+
+
+/**
+ * @brief Reads the calibrated current value and returns it in Amperes.
+ */
+float ina219_read_current()
+{
+    uint16_t raw_current;
+    
+    if (ina219_read_reg(REG_CURRENT, &raw_current) != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to read Current Register.");
+        return 0.0f; // Return 0 on error
+    }
+    
+    // The raw current value is a 16-bit signed integer (Twos Complement)
+    // The result is in LSBs, multiply by the Current LSB to get Amperes.
+    // The chip handles the signed nature of the current measurement.
+    int16_t signed_raw_current = (int16_t)raw_current;
+
+    // Calculate the final current in Amperes
+    float current_A = (float)signed_raw_current * LSB_CURRENT_A;
+    
+    return current_A;
+}
 
 #define DEFINE_PSTRING(var, str)   \
     const struct                   \
@@ -105,11 +215,12 @@ static void temp_task(void *pvParameters)
 
         char temp_str[10];
         sprintf(temp_str, "%.2f C ", temp);
-        gfx_draw_text(0, 10, temp_str);
+        // gfx_draw_text(0, 10, temp_str);
+        ESP_LOGI(TAG, "%s", temp_str);
 
         temps[temp_index] = temp;
 
-        draw_graph();
+        // draw_graph();
         if(zb_connected)
             report_temperature(temp);
 
@@ -126,8 +237,12 @@ static void temp_task(void *pvParameters)
             gfx_draw_text(0, 20, "heat off");
         }
 
-        gfx_flush();
+        // gfx_flush();
         temp_index = (temp_index + 1) % 128;
+
+        float current = ina219_read_current();
+        
+        ESP_LOGI(TAG, "Current: %.4f A (LSB = %.6f A)", current, LSB_CURRENT_A);
     }
 }
 
@@ -337,6 +452,8 @@ static void esp_zb_task(void *pvParameters)
     esp_zb_stack_main_loop();
 }
 
+
+
 void app_main(void)
 {
     // setup onboard led
@@ -376,41 +493,60 @@ void app_main(void)
     };
 
     i2c_master_bus_handle_t bus_handle;
-    i2c_new_master_bus(&i2c_bus_conf, &bus_handle);
+    esp_err_t ret = i2c_new_master_bus(&i2c_bus_conf, &bus_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to create I2C master bus: %s", esp_err_to_name(ret));
+    }
 
-    esp_lcd_panel_io_handle_t io_handle = NULL;
-    esp_lcd_panel_io_i2c_config_t io_config = {
-        .dev_addr = TEST_I2C_DEV_ADDR,
-        .scl_speed_hz = TEST_LCD_PIXEL_CLOCK_HZ,
-        .control_phase_bytes = 1, // According to SSD1306 datasheet
-        .dc_bit_offset = 6,       // According to SSD1306 datasheet
-        .lcd_cmd_bits = 8,        // According to SSD1306 datasheet
-        .lcd_param_bits = 8,      // According to SSD1306 datasheet
+    // --- Add the INA219 device to the bus ---
+    i2c_device_config_t dev_config = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = INA219_ADDR,
+        .scl_speed_hz = I2C_MASTER_FREQ_HZ,
     };
 
-    esp_lcd_new_panel_io_i2c(bus_handle, &io_config, &io_handle);
+    ret = i2c_master_bus_add_device(bus_handle, &dev_config, &ina219_dev_handle);
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to add INA219 device: %s", esp_err_to_name(ret));
+    } else {
+        ESP_LOGI(TAG, "I2C bus and INA219 device handle started successfully.");
+    }
 
-    esp_lcd_panel_handle_t panel_handle = NULL;
-    esp_lcd_panel_dev_config_t panel_config = {
-        .bits_per_pixel = 1,
-        .reset_gpio_num = -1,
-    };
-    esp_lcd_new_panel_ssd1306(io_handle, &panel_config, &panel_handle);
-    esp_lcd_panel_reset(panel_handle);
-    esp_lcd_panel_init(panel_handle);
-    // turn on display
-    esp_lcd_panel_disp_on_off(panel_handle, true);
+    // i2c_new_master_bus(&i2c_bus_conf, &bus_handle);
 
-    // mirror the display
-    esp_lcd_panel_mirror(panel_handle, true, true);
+    // esp_lcd_panel_io_handle_t io_handle = NULL;
+    // esp_lcd_panel_io_i2c_config_t io_config = {
+    //     .dev_addr = TEST_I2C_DEV_ADDR,
+    //     .scl_speed_hz = TEST_LCD_PIXEL_CLOCK_HZ,
+    //     .control_phase_bytes = 1, // According to SSD1306 datasheet
+    //     .dc_bit_offset = 6,       // According to SSD1306 datasheet
+    //     .lcd_cmd_bits = 8,        // According to SSD1306 datasheet
+    //     .lcd_param_bits = 8,      // According to SSD1306 datasheet
+    // };
+
+    // esp_lcd_new_panel_io_i2c(bus_handle, &io_config, &io_handle);
+
+    // esp_lcd_panel_handle_t panel_handle = NULL;
+    // esp_lcd_panel_dev_config_t panel_config = {
+    //     .bits_per_pixel = 1,
+    //     .reset_gpio_num = -1,
+    // };
+    // esp_lcd_new_panel_ssd1306(io_handle, &panel_config, &panel_handle);
+    // esp_lcd_panel_reset(panel_handle);
+    // esp_lcd_panel_init(panel_handle);
+    // // turn on display
+    // esp_lcd_panel_disp_on_off(panel_handle, true);
+
+    // // mirror the display
+    // esp_lcd_panel_mirror(panel_handle, true, true);
 
     
 
-    gfx_init(panel_handle, TEST_LCD_H_RES, TEST_LCD_V_RES);
+    // gfx_init(panel_handle, TEST_LCD_H_RES, TEST_LCD_V_RES);
 
-    gfx_clear_area(0, 0, 128, 64);
-    gfx_draw_text(0, 0, "Beer warmer");
-    gfx_flush();
+    // gfx_clear_area(0, 0, 128, 64);
+    // gfx_draw_text(0, 0, "Beer warmer");
+    // gfx_flush();
 
     // while(1){
 
@@ -425,6 +561,22 @@ void app_main(void)
 
     //     temp_index = (temp_index + 1) % 128;
     // }
+
+    // init current sens ic (INA219AxDCN)
+    // 20mR shunt resistor
+    // current_lsb = max_current / 2^15
+    // max current = 2A
+    // cal = trunc(0.04096 / (current_lsb * shunt_resistance))
+    // cal = trunc(0.04096 / ( (2.0 / 32768.0) * 0.02)) = 33554
+
+    // current register = (shunt voltage * cal) / 4096
+    // power register = (current register * bus voltage) / 5000
+
+    if (ina219_init_and_calibrate() == ESP_OK) {
+        ESP_LOGI(TAG, "INA219 ready for 2A max measurements.");
+    } else {
+        ESP_LOGE(TAG, "INA219 setup failed. Check wiring and I2C initialization.");
+    }
 
     // task for keeping track of temperature
     xTaskCreate(temp_task, "temp_task", 4096, NULL, 5, NULL);

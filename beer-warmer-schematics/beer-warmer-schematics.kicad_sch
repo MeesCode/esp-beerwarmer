@@ -4872,6 +4872,16 @@
 		)
 		(uuid "cf97e64e-e9c2-4c07-952f-5505bc9f4774")
 	)
+	(text "addr 1000000"
+		(exclude_from_sim no)
+		(at 244.856 141.224 0)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+		(uuid "d80a8451-3d3d-40b6-a6c7-b80a621af82b")
+	)
 	(text "CFG1->GND\nCFG2->GND\nCFG3->VDD\nFor 12V"
 		(exclude_from_sim no)
 		(at 99.314 121.92 0)
