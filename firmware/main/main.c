@@ -176,30 +176,31 @@ void report_electrical_data(float current, float voltage) {
     float power = current * voltage;
 
     ESP_LOGI(TAG, "Current: %.4f A Voltage: %.2f V Power: %.2f W", current, voltage, power);
-    
-    // 2. Convert to integers scaled by 1000 (e.g., 1.234A -> 1234)
-    // We use int16_t because that is the ZCL standard for these attributes
+
+    // 2. Convert to integers:
+    // Current and voltage scaled by 1000 (ACCURRENT/ACVOLTAGE_DIVISOR=1000)
+    // Power NOT scaled (ACPOWER_DIVISOR=1), raw watts
     int16_t cur_zb = (int16_t)(current * 1000);
     int16_t vol_zb = (int16_t)(voltage * 1000);
     int16_t pwr_zb = (int16_t)(power);
 
-    // 3. Report to Zigbee using the 16-bit pointers
-    esp_zb_zcl_set_attribute_val(HA_ESP_ENDPOINT, 
-        ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, 
-        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, 
-        ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_ID, 
+    // 3. Report to Zigbee using AC attributes (what HA supports)
+    esp_zb_zcl_set_attribute_val(HA_ESP_ENDPOINT,
+        ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT,
+        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+        ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMSCURRENT_ID,
         &cur_zb, false);
 
-    esp_zb_zcl_set_attribute_val(HA_ESP_ENDPOINT, 
-        ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, 
-        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, 
-        ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_ID, 
+    esp_zb_zcl_set_attribute_val(HA_ESP_ENDPOINT,
+        ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT,
+        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+        ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMSVOLTAGE_ID,
         &vol_zb, false);
 
-    esp_zb_zcl_set_attribute_val(HA_ESP_ENDPOINT, 
-        ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, 
-        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, 
-        ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID, 
+    esp_zb_zcl_set_attribute_val(HA_ESP_ENDPOINT,
+        ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT,
+        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+        ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID,
         &pwr_zb, false);
 }
 void draw_graph()
@@ -422,33 +423,32 @@ static void esp_zb_task(void *pvParameters)
     };
     esp_zb_attribute_list_t *esp_zb_binary_input_cluster = esp_zb_binary_input_cluster_create(&binary_input_cfg);
 
-    // Cluster power measurement setup
+    // Cluster power measurement setup - use AC attributes as HA only supports those
     esp_zb_electrical_meas_cluster_cfg_t electrical_measurement_cfg = {
-        .measured_type = 0x01, // Bit 0 set = DC Measurement
+        .measured_type = 0x08, // Bit 3 = Phase A Measurement (AC)
     };
     esp_zb_attribute_list_t *esp_zb_electrical_measurement_cluster = esp_zb_electrical_meas_cluster_create(&electrical_measurement_cfg);
 
-    // Initialize attributes
+    // Initialize AC attributes (what HA supports)
     int16_t zero = 0;
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_ID, &zero);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_ID, &zero);
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMSVOLTAGE_ID, &zero);
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMSCURRENT_ID, &zero);
     esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID, &zero);
 
     uint16_t div = 1000;
     uint16_t mult = 1;
-    uint16_t divpower = 1;
 
-    // Power Scaling
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_POWER_DIVISOR_ID, &divpower);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_POWER_MULTIPLIER_ID, &mult);
+    // AC Power Scaling: value in watts, divisor=1
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACPOWER_DIVISOR_ID, &mult);
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACPOWER_MULTIPLIER_ID, &mult);
 
-    // Current Scaling
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_DIVISOR_ID, &div);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_MULTIPLIER_ID, &mult);
+    // AC Current Scaling: value * 1000, divisor = 1000 -> actual amps
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACCURRENT_DIVISOR_ID, &div);
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACCURRENT_MULTIPLIER_ID, &mult);
 
-    // Voltage Scaling
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_DIVISOR_ID, &div);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_MULTIPLIER_ID, &mult);
+    // AC Voltage Scaling: value * 1000, divisor = 1000 -> actual volts
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACVOLTAGE_DIVISOR_ID, &div);
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACVOLTAGE_MULTIPLIER_ID, &mult);
 
     // create cluster list
     esp_zb_cluster_list_t *esp_zb_cluster_list = esp_zb_zcl_cluster_list_create();
@@ -507,7 +507,7 @@ static void esp_zb_task(void *pvParameters)
     };
     esp_zb_zcl_update_reporting_info(&reporting_info_binary);
 
-    // setup automatic reporting for DC Current
+    // setup automatic reporting for RMS Current
     esp_zb_zcl_reporting_info_t reporting_info_current = {
         .direction = ESP_ZB_ZCL_CMD_DIRECTION_TO_SRV,
         .ep = HA_ESP_ENDPOINT,
@@ -519,12 +519,12 @@ static void esp_zb_task(void *pvParameters)
         .u.send_info.def_min_interval = 1,
         .u.send_info.def_max_interval = 0,
         .u.send_info.delta.u16 = 1,
-        .attr_id = ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_ID,
+        .attr_id = ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_RMSCURRENT_ID,
         .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
     };
     esp_zb_zcl_update_reporting_info(&reporting_info_current);
 
-    // --- FIX #3: ADD REPORTING FOR ACTIVE POWER (What HA displays) ---
+    // Reporting for Active Power
     esp_zb_zcl_reporting_info_t reporting_info_power = {
         .direction = ESP_ZB_ZCL_CMD_DIRECTION_TO_SRV,
         .ep = HA_ESP_ENDPOINT,
@@ -535,8 +535,8 @@ static void esp_zb_task(void *pvParameters)
         .u.send_info.max_interval = 0,
         .u.send_info.def_min_interval = 1,
         .u.send_info.def_max_interval = 0,
-        .u.send_info.delta.u16 = 1, // Report on a change of 1 LSB (1mW)
-        .attr_id = ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID, 
+        .u.send_info.delta.u16 = 1,
+        .attr_id = ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID,
         .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
     };
     esp_zb_zcl_update_reporting_info(&reporting_info_power);
