@@ -171,29 +171,37 @@ void report_temperature(float temp)
     );
 }
 
-void report_current(float power)
-{
-    uint16_t current_zb = (uint16_t)(power*1000.);
-    uint16_t power_zb = power * 12; // assuming 12V supply
-    esp_zb_zcl_set_attribute_val(
-        HA_ESP_ENDPOINT, 
+void report_electrical_data(float current, float voltage) {
+    // 1. Calculate Power
+    float power = current * voltage;
+
+    ESP_LOGI(TAG, "Current: %.4f A Voltage: %.2f V Power: %.2f W", current, voltage, power);
+    
+    // 2. Convert to integers scaled by 1000 (e.g., 1.234A -> 1234)
+    // We use int16_t because that is the ZCL standard for these attributes
+    int16_t cur_zb = (int16_t)(current * 1000);
+    int16_t vol_zb = (int16_t)(voltage * 1000);
+    int16_t pwr_zb = (int16_t)(power);
+
+    // 3. Report to Zigbee using the 16-bit pointers
+    esp_zb_zcl_set_attribute_val(HA_ESP_ENDPOINT, 
         ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, 
         ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, 
         ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_ID, 
-        &current_zb, 
-        false
-    );
+        &cur_zb, false);
 
-    esp_zb_zcl_set_attribute_val(
-        HA_ESP_ENDPOINT, 
+    esp_zb_zcl_set_attribute_val(HA_ESP_ENDPOINT, 
+        ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, 
+        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, 
+        ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_ID, 
+        &vol_zb, false);
+
+    esp_zb_zcl_set_attribute_val(HA_ESP_ENDPOINT, 
         ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, 
         ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, 
         ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID, 
-        &power_zb, 
-        false
-    );
+        &pwr_zb, false);
 }
-
 void draw_graph()
 {
     gfx_clear_area(0, 32, 128, 32);
@@ -205,7 +213,7 @@ void draw_graph()
     }
 
     float pxpt = (32.0) / (max_temp - min_temp);
-    ESP_LOGI(TAG, "index: %d, max_temp: %f, min_temp: %f", temp_index, max_temp, min_temp);
+    // ESP_LOGI(TAG, "index: %d, max_temp: %f, min_temp: %f", temp_index, max_temp, min_temp);
 
     int prev_y = -1.0f;
     for(int i = 0; i < 128; i++){
@@ -238,12 +246,12 @@ static void temp_task(void *pvParameters)
 
         char temp_str[10];
         sprintf(temp_str, "%.2f C ", temp);
-        // gfx_draw_text(0, 10, temp_str);
+        gfx_draw_text(0, 10, temp_str);
         ESP_LOGI(TAG, "%s", temp_str);
 
         temps[temp_index] = temp;
 
-        // draw_graph();
+        draw_graph();
         if(zb_connected)
             report_temperature(temp);
 
@@ -260,14 +268,12 @@ static void temp_task(void *pvParameters)
             gfx_draw_text(0, 20, "heat off");
         }
 
-        // gfx_flush();
+        gfx_flush();
         temp_index = (temp_index + 1) % 128;
 
         float current = ina219_read_current();
         if(zb_connected)
-            report_current(current); // assuming 12V supply
-        
-        ESP_LOGI(TAG, "Current: %.4f A (LSB = %.6f A)", current, LSB_CURRENT_A);
+            report_electrical_data(current, 12.); // assuming 12V supply
     }
 }
 
@@ -416,31 +422,33 @@ static void esp_zb_task(void *pvParameters)
     };
     esp_zb_attribute_list_t *esp_zb_binary_input_cluster = esp_zb_binary_input_cluster_create(&binary_input_cfg);
 
-    // cluser power measurement (DC Current, Voltage, and Power)
+    // Cluster power measurement setup
     esp_zb_electrical_meas_cluster_cfg_t electrical_measurement_cfg = {
-        .measured_type = ESP_ZB_ZCL_ELECTRICAL_MEASUREMENT_DC_MEASUREMENT,
+        .measured_type = 0x01, // Bit 0 set = DC Measurement
     };
     esp_zb_attribute_list_t *esp_zb_electrical_measurement_cluster = esp_zb_electrical_meas_cluster_create(&electrical_measurement_cfg);
 
-    // --- FIX #1: ADD REQUIRED ELECTRICAL MEASUREMENT ATTRIBUTES (Mandatory for HA) ---
-    // These attributes need to be created and updated elsewhere in the application code
-    int16_t measured_current = 0;   // DC Current value (e.g., in mA)
-    int16_t measured_voltage = 0;   // DC Voltage value (e.g., in mV)
-    int16_t measured_power = 0;     // Active Power value (e.g., in mW)
-    uint16_t multiplier = 1;        // Multiplier: 1
-    uint16_t divisor = 1000;      // Divisor: 1000 (Values are in m units)
-    
-    // Add the core measured values
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_ID, &measured_current);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_ID, &measured_voltage);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID, &measured_power);
+    // Initialize attributes
+    int16_t zero = 0;
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_ID, &zero);
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_ID, &zero);
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID, &zero);
 
-    // Add Multiplier/Divisor for scaling (Crucial for Home Assistant to interpret the data correctly)
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_MULTIPLIER_ID, &multiplier);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_DIVISOR_ID, &divisor);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_POWER_MULTIPLIER_ID, &multiplier);
-    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_POWER_DIVISOR_ID, &divisor);
-    // -------------------------------------------------------------------------------------
+    uint16_t div = 1000;
+    uint16_t mult = 1;
+    uint16_t divpower = 1;
+
+    // Power Scaling
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_POWER_DIVISOR_ID, &divpower);
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_POWER_MULTIPLIER_ID, &mult);
+
+    // Current Scaling
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_DIVISOR_ID, &div);
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_MULTIPLIER_ID, &mult);
+
+    // Voltage Scaling
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_DIVISOR_ID, &div);
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_MULTIPLIER_ID, &mult);
 
     // create cluster list
     esp_zb_cluster_list_t *esp_zb_cluster_list = esp_zb_zcl_cluster_list_create();
@@ -456,8 +464,7 @@ static void esp_zb_task(void *pvParameters)
     esp_zb_endpoint_config_t endpoint_config = {
         .endpoint = HA_ESP_ENDPOINT,
         .app_profile_id = ESP_ZB_AF_HA_PROFILE_ID,
-        // --- FIX #2: CHANGED DEVICE ID TO METERING DEVICE ---
-        .app_device_id = ESP_ZB_HA_ON_OFF_LIGHT_DEVICE_ID, // Use 0x0006 for devices with metering capability
+        .app_device_id = ESP_ZB_HA_SMART_PLUG_DEVICE_ID, // Use 0x0051 for Switch + Metering
     };
     esp_zb_ep_list_add_ep(esp_zb_ep_list, esp_zb_cluster_list, endpoint_config);
 
@@ -601,65 +608,37 @@ void app_main(void)
         ESP_LOGI(TAG, "I2C bus and INA219 device handle started successfully.");
     }
 
-    // i2c_new_master_bus(&i2c_bus_conf, &bus_handle);
+    esp_lcd_panel_io_handle_t io_handle = NULL;
+    esp_lcd_panel_io_i2c_config_t io_config = {
+        .dev_addr = TEST_I2C_DEV_ADDR,
+        .scl_speed_hz = TEST_LCD_PIXEL_CLOCK_HZ,
+        .control_phase_bytes = 1, // According to SSD1306 datasheet
+        .dc_bit_offset = 6,       // According to SSD1306 datasheet
+        .lcd_cmd_bits = 8,        // According to SSD1306 datasheet
+        .lcd_param_bits = 8,      // According to SSD1306 datasheet
+    };
 
-    // esp_lcd_panel_io_handle_t io_handle = NULL;
-    // esp_lcd_panel_io_i2c_config_t io_config = {
-    //     .dev_addr = TEST_I2C_DEV_ADDR,
-    //     .scl_speed_hz = TEST_LCD_PIXEL_CLOCK_HZ,
-    //     .control_phase_bytes = 1, // According to SSD1306 datasheet
-    //     .dc_bit_offset = 6,       // According to SSD1306 datasheet
-    //     .lcd_cmd_bits = 8,        // According to SSD1306 datasheet
-    //     .lcd_param_bits = 8,      // According to SSD1306 datasheet
-    // };
+    esp_lcd_new_panel_io_i2c(bus_handle, &io_config, &io_handle);
 
-    // esp_lcd_new_panel_io_i2c(bus_handle, &io_config, &io_handle);
+    esp_lcd_panel_handle_t panel_handle = NULL;
+    esp_lcd_panel_dev_config_t panel_config = {
+        .bits_per_pixel = 1,
+        .reset_gpio_num = -1,
+    };
+    esp_lcd_new_panel_ssd1306(io_handle, &panel_config, &panel_handle);
+    esp_lcd_panel_reset(panel_handle);
+    esp_lcd_panel_init(panel_handle);
+    // turn on display
+    esp_lcd_panel_disp_on_off(panel_handle, true);
 
-    // esp_lcd_panel_handle_t panel_handle = NULL;
-    // esp_lcd_panel_dev_config_t panel_config = {
-    //     .bits_per_pixel = 1,
-    //     .reset_gpio_num = -1,
-    // };
-    // esp_lcd_new_panel_ssd1306(io_handle, &panel_config, &panel_handle);
-    // esp_lcd_panel_reset(panel_handle);
-    // esp_lcd_panel_init(panel_handle);
-    // // turn on display
-    // esp_lcd_panel_disp_on_off(panel_handle, true);
+    // mirror the display
+    esp_lcd_panel_mirror(panel_handle, true, true);
 
-    // // mirror the display
-    // esp_lcd_panel_mirror(panel_handle, true, true);
+    gfx_init(panel_handle, TEST_LCD_H_RES, TEST_LCD_V_RES);
 
-    
-
-    // gfx_init(panel_handle, TEST_LCD_H_RES, TEST_LCD_V_RES);
-
-    // gfx_clear_area(0, 0, 128, 64);
-    // gfx_draw_text(0, 0, "Beer warmer");
-    // gfx_flush();
-
-    // while(1){
-
-    //     temps[temp_index] = temp_index > 0 ? temps[(temp_index - 1) % 128] + ((rand() % 2) - 0.5) : temps[119] + ((rand() % 2) - 0.5);
-
-    //     char temp_str[10];
-    //     sprintf(temp_str, "%.2f C ", temps[temp_index]);
-    //     gfx_draw_text(0, 10, temp_str);
-
-    //     draw_graph();
-    //     gfx_flush();
-
-    //     temp_index = (temp_index + 1) % 128;
-    // }
-
-    // init current sens ic (INA219AxDCN)
-    // 20mR shunt resistor
-    // current_lsb = max_current / 2^15
-    // max current = 2A
-    // cal = trunc(0.04096 / (current_lsb * shunt_resistance))
-    // cal = trunc(0.04096 / ( (2.0 / 32768.0) * 0.02)) = 33554
-
-    // current register = (shunt voltage * cal) / 4096
-    // power register = (current register * bus voltage) / 5000
+    gfx_clear_area(0, 0, 128, 64);
+    gfx_draw_text(0, 0, "Beer warmer");
+    gfx_flush();
 
     if (ina219_init_and_calibrate() == ESP_OK) {
         ESP_LOGI(TAG, "INA219 ready for 2A max measurements.");
