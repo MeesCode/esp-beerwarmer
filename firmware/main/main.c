@@ -171,6 +171,29 @@ void report_temperature(float temp)
     );
 }
 
+void report_current(float power)
+{
+    uint16_t current_zb = (uint16_t)(power*1000.);
+    uint16_t power_zb = power * 12; // assuming 12V supply
+    esp_zb_zcl_set_attribute_val(
+        HA_ESP_ENDPOINT, 
+        ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, 
+        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, 
+        ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_ID, 
+        &current_zb, 
+        false
+    );
+
+    esp_zb_zcl_set_attribute_val(
+        HA_ESP_ENDPOINT, 
+        ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT, 
+        ESP_ZB_ZCL_CLUSTER_SERVER_ROLE, 
+        ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID, 
+        &power_zb, 
+        false
+    );
+}
+
 void draw_graph()
 {
     gfx_clear_area(0, 32, 128, 32);
@@ -241,6 +264,8 @@ static void temp_task(void *pvParameters)
         temp_index = (temp_index + 1) % 128;
 
         float current = ina219_read_current();
+        if(zb_connected)
+            report_current(current); // assuming 12V supply
         
         ESP_LOGI(TAG, "Current: %.4f A (LSB = %.6f A)", current, LSB_CURRENT_A);
     }
@@ -346,7 +371,7 @@ static void esp_zb_task(void *pvParameters)
     // setup basic cluster
     esp_zb_basic_cluster_cfg_t basic_cluster_cfg = {
         .zcl_version = ESP_ZB_ZCL_BASIC_ZCL_VERSION_DEFAULT_VALUE,
-        .power_source = 0x03,
+        .power_source = 0x03, // Mains (AC)
     };
     uint32_t ApplicationVersion = 0x0001;
     uint32_t StackVersion = 0x0002;
@@ -375,7 +400,7 @@ static void esp_zb_task(void *pvParameters)
     };
     esp_zb_attribute_list_t *esp_zb_on_off_cluster = esp_zb_on_off_cluster_create(&on_off_cfg);
 
-    // cluster temperature measurement (0 to 30 degree celsius)
+    // cluster temperature measurement
     esp_zb_temperature_meas_cluster_cfg_t temperature_meas_cfg = {
         .measured_value = 0xFFFF,
         .min_value = 0,
@@ -391,6 +416,32 @@ static void esp_zb_task(void *pvParameters)
     };
     esp_zb_attribute_list_t *esp_zb_binary_input_cluster = esp_zb_binary_input_cluster_create(&binary_input_cfg);
 
+    // cluser power measurement (DC Current, Voltage, and Power)
+    esp_zb_electrical_meas_cluster_cfg_t electrical_measurement_cfg = {
+        .measured_type = ESP_ZB_ZCL_ELECTRICAL_MEASUREMENT_DC_MEASUREMENT,
+    };
+    esp_zb_attribute_list_t *esp_zb_electrical_measurement_cluster = esp_zb_electrical_meas_cluster_create(&electrical_measurement_cfg);
+
+    // --- FIX #1: ADD REQUIRED ELECTRICAL MEASUREMENT ATTRIBUTES (Mandatory for HA) ---
+    // These attributes need to be created and updated elsewhere in the application code
+    int16_t measured_current = 0;   // DC Current value (e.g., in mA)
+    int16_t measured_voltage = 0;   // DC Voltage value (e.g., in mV)
+    int16_t measured_power = 0;     // Active Power value (e.g., in mW)
+    uint16_t multiplier = 1;        // Multiplier: 1
+    uint16_t divisor = 1000;      // Divisor: 1000 (Values are in m units)
+    
+    // Add the core measured values
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_ID, &measured_current);
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_VOLTAGE_ID, &measured_voltage);
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID, &measured_power);
+
+    // Add Multiplier/Divisor for scaling (Crucial for Home Assistant to interpret the data correctly)
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_MULTIPLIER_ID, &multiplier);
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_DIVISOR_ID, &divisor);
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_POWER_MULTIPLIER_ID, &multiplier);
+    esp_zb_electrical_meas_cluster_add_attr(esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_POWER_DIVISOR_ID, &divisor);
+    // -------------------------------------------------------------------------------------
+
     // create cluster list
     esp_zb_cluster_list_t *esp_zb_cluster_list = esp_zb_zcl_cluster_list_create();
     esp_zb_cluster_list_add_basic_cluster(esp_zb_cluster_list, esp_zb_basic_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
@@ -398,13 +449,15 @@ static void esp_zb_task(void *pvParameters)
     esp_zb_cluster_list_add_on_off_cluster(esp_zb_cluster_list, esp_zb_on_off_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
     esp_zb_cluster_list_add_temperature_meas_cluster(esp_zb_cluster_list, esp_zb_temperature_meas_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
     esp_zb_cluster_list_add_binary_input_cluster(esp_zb_cluster_list, esp_zb_binary_input_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
+    esp_zb_cluster_list_add_electrical_meas_cluster(esp_zb_cluster_list, esp_zb_electrical_measurement_cluster, ESP_ZB_ZCL_CLUSTER_SERVER_ROLE);
 
     // create endpoint list
     esp_zb_ep_list_t *esp_zb_ep_list = esp_zb_ep_list_create();
     esp_zb_endpoint_config_t endpoint_config = {
         .endpoint = HA_ESP_ENDPOINT,
         .app_profile_id = ESP_ZB_AF_HA_PROFILE_ID,
-        .app_device_id = ESP_ZB_HA_ON_OFF_LIGHT_DEVICE_ID,
+        // --- FIX #2: CHANGED DEVICE ID TO METERING DEVICE ---
+        .app_device_id = ESP_ZB_HA_ON_OFF_LIGHT_DEVICE_ID, // Use 0x0006 for devices with metering capability
     };
     esp_zb_ep_list_add_ep(esp_zb_ep_list, esp_zb_cluster_list, endpoint_config);
 
@@ -412,7 +465,8 @@ static void esp_zb_task(void *pvParameters)
     esp_zb_device_register(esp_zb_ep_list);
     esp_zb_core_action_handler_register(zb_action_handler);
 
-    esp_zb_zcl_reporting_info_t reporting_info = {
+    // setup automatic reporting for temperature
+    esp_zb_zcl_reporting_info_t reporting_info_temp = {
         .direction = ESP_ZB_ZCL_CMD_DIRECTION_TO_SRV,
         .ep = HA_ESP_ENDPOINT,
         .cluster_id = ESP_ZB_ZCL_CLUSTER_ID_TEMP_MEASUREMENT,
@@ -426,7 +480,7 @@ static void esp_zb_task(void *pvParameters)
         .attr_id = ESP_ZB_ZCL_ATTR_TEMP_MEASUREMENT_VALUE_ID,
         .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
     };
-    esp_zb_zcl_update_reporting_info(&reporting_info);
+    esp_zb_zcl_update_reporting_info(&reporting_info_temp);
 
     // setup automatic reporting for binary input
     esp_zb_zcl_reporting_info_t reporting_info_binary = {
@@ -445,6 +499,41 @@ static void esp_zb_task(void *pvParameters)
         .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
     };
     esp_zb_zcl_update_reporting_info(&reporting_info_binary);
+
+    // setup automatic reporting for DC Current
+    esp_zb_zcl_reporting_info_t reporting_info_current = {
+        .direction = ESP_ZB_ZCL_CMD_DIRECTION_TO_SRV,
+        .ep = HA_ESP_ENDPOINT,
+        .cluster_id = ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT,
+        .cluster_role = ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+        .dst.profile_id = ESP_ZB_AF_HA_PROFILE_ID,
+        .u.send_info.min_interval = 1,
+        .u.send_info.max_interval = 0,
+        .u.send_info.def_min_interval = 1,
+        .u.send_info.def_max_interval = 0,
+        .u.send_info.delta.u16 = 1,
+        .attr_id = ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_DC_CURRENT_ID,
+        .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
+    };
+    esp_zb_zcl_update_reporting_info(&reporting_info_current);
+
+    // --- FIX #3: ADD REPORTING FOR ACTIVE POWER (What HA displays) ---
+    esp_zb_zcl_reporting_info_t reporting_info_power = {
+        .direction = ESP_ZB_ZCL_CMD_DIRECTION_TO_SRV,
+        .ep = HA_ESP_ENDPOINT,
+        .cluster_id = ESP_ZB_ZCL_CLUSTER_ID_ELECTRICAL_MEASUREMENT,
+        .cluster_role = ESP_ZB_ZCL_CLUSTER_SERVER_ROLE,
+        .dst.profile_id = ESP_ZB_AF_HA_PROFILE_ID,
+        .u.send_info.min_interval = 1,
+        .u.send_info.max_interval = 0,
+        .u.send_info.def_min_interval = 1,
+        .u.send_info.def_max_interval = 0,
+        .u.send_info.delta.u16 = 1, // Report on a change of 1 LSB (1mW)
+        .attr_id = ESP_ZB_ZCL_ATTR_ELECTRICAL_MEASUREMENT_ACTIVE_POWER_ID, 
+        .manuf_code = ESP_ZB_ZCL_ATTR_NON_MANUFACTURER_SPECIFIC,
+    };
+    esp_zb_zcl_update_reporting_info(&reporting_info_power);
+    // ---------------------------------------------------------------
 
     // start zigbee
     esp_zb_set_primary_network_channel_set(ESP_ZB_PRIMARY_CHANNEL_MASK);
