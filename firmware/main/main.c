@@ -23,7 +23,7 @@ static const char *TAG = "MAIN";
 bool zb_connected = false;
 bool switch_state = true;
 
-const float target_temp = 22.0;
+const float target_temp = 20.0;
 const float temp_offset = 0.1;
 
 float temps[128] = {-1.0f};

@@ -57,6 +57,9 @@ esp_err_t init_temp_sensor(void)
             } else {
                 ESP_LOGI(TAG, "Found an unknown device, address: %016llX", next_onewire_device.address);
             }
+        } else if (search_result != ESP_ERR_NOT_FOUND) {
+            ESP_LOGW(TAG, "1-Wire search failed: %s, aborting search", esp_err_to_name(search_result));
+            break;
         }
     } while (search_result != ESP_ERR_NOT_FOUND);
     onewire_del_device_iter(iter);
