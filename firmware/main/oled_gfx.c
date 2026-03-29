@@ -1,6 +1,6 @@
-
 #include "oled_gfx.h"
 #include "string.h"
+#include <stdbool.h>
 
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_vendor.h"
@@ -8,7 +8,7 @@
 
 #include "font8x8_basic.h"
 
-struct oled_gfx gfx;
+struct oled_gfx gfx = {0};
 
 char* display_buffer = NULL;
 
@@ -52,7 +52,7 @@ void gfx_fill_area(int x, int y, int w, int h)
 }
 
 void gfx_set_pixel(uint8_t x, uint8_t y) {
-    if (x >= gfx.width || y >= gfx.height) return;  // Bounds check
+    if (!display_buffer || x >= gfx.width || y >= gfx.height) return;
 
     uint8_t page = y / 8;
     uint8_t bit = y % 8;
@@ -61,7 +61,7 @@ void gfx_set_pixel(uint8_t x, uint8_t y) {
 }
 
 void gfx_clear_pixel(uint8_t x, uint8_t y) {
-    if (x >= gfx.width || y >= gfx.height) return;  // Bounds check
+    if (!display_buffer || x >= gfx.width || y >= gfx.height) return;
 
     uint8_t page = y / 8;
     uint8_t bit = y % 8;
@@ -78,7 +78,13 @@ void gfx_draw_text(int x, int y, const char *text)
     }
 }
 
+bool gfx_available(void)
+{
+    return gfx.panel_handle != NULL && display_buffer != NULL;
+}
+
 void gfx_flush()
 {
+    if (!gfx_available()) return;
     esp_lcd_panel_draw_bitmap(gfx.panel_handle, 0, 0, gfx.width, gfx.height, display_buffer);
 }

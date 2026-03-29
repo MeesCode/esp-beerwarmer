@@ -12,6 +12,7 @@
 #include "esp_lcd_panel_vendor.h"
 #include "esp_lcd_panel_ops.h"
 
+#include <math.h>
 #include "temp_sensor.h"
 #include "oled_gfx.h"
 #include "ina219.h"
@@ -27,8 +28,6 @@ const float temp_offset = 0.1;
 
 float temps[128] = {-1.0f};
 int temp_index = 0;
-
-i2c_master_bus_handle_t bus_handle;
 
 // I2C Master Configuration
 #define I2C_MASTER_SDA_IO   21
@@ -141,39 +140,51 @@ static void temp_task(void *pvParameters)
     for(;;){
         vTaskDelay(100 / portTICK_PERIOD_MS);
 
-        float temp = get_temp();
+        // Temperature reading - only if sensor is connected
+        if (temp_sensor_available()) {
+            float temp = get_temp();
 
-        char temp_str[10];
-        sprintf(temp_str, "%.2f C ", temp);
-        gfx_draw_text(0, 10, temp_str);
-        ESP_LOGI(TAG, "%s", temp_str);
+            if (!isnan(temp)) {
+                char temp_str[10];
+                sprintf(temp_str, "%.2f C ", temp);
+                gfx_draw_text(0, 10, temp_str);
+                ESP_LOGI(TAG, "%s", temp_str);
 
-        temps[temp_index] = temp;
+                temps[temp_index] = temp;
+                draw_graph();
 
-        draw_graph();
-        if(zb_connected)
-            report_temperature(temp);
+                if(zb_connected)
+                    report_temperature(temp);
 
-        // roughly keep temp at 25c by turning on/off the heater
-        if(temp < target_temp - temp_offset && switch_state){
-            gpio_set_level(HEATER_PIN, 1);
-            if(zb_connected)
-                report_output_binary_sensor(1);
-            gfx_draw_text(0, 20, "heat on ");
-        } else if(temp > target_temp + temp_offset || !switch_state){
+                // roughly keep temp at 25c by turning on/off the heater
+                if(temp < target_temp - temp_offset && switch_state){
+                    gpio_set_level(HEATER_PIN, 1);
+                    if(zb_connected)
+                        report_output_binary_sensor(1);
+                    gfx_draw_text(0, 20, "heat on ");
+                } else if(temp > target_temp + temp_offset || !switch_state){
+                    gpio_set_level(HEATER_PIN, 0);
+                    if(zb_connected)
+                        report_output_binary_sensor(0);
+                    gfx_draw_text(0, 20, "heat off");
+                }
+
+                temp_index = (temp_index + 1) % 128;
+            }
+        } else {
+            // No temp sensor - ensure heater is off for safety
             gpio_set_level(HEATER_PIN, 0);
-            if(zb_connected)
-                report_output_binary_sensor(0);
-            gfx_draw_text(0, 20, "heat off");
         }
 
         gfx_flush();
-        temp_index = (temp_index + 1) % 128;
 
-        float current = ina219_read_current();
-        float voltage = ina219_read_voltage();
-        if(zb_connected)
-            report_electrical_data(current, voltage);
+        // Electrical measurement - only if sensor is connected
+        if (ina219_available()) {
+            float current = ina219_read_current();
+            float voltage = ina219_read_voltage();
+            if(zb_connected)
+                report_electrical_data(current, voltage);
+        }
     }
 }
 
@@ -487,48 +498,57 @@ void app_main(void)
         .flags.enable_internal_pullup = true,
     };
 
-    i2c_master_bus_handle_t bus_handle;
+    i2c_master_bus_handle_t bus_handle = NULL;
     esp_err_t ret = i2c_new_master_bus(&i2c_bus_conf, &bus_handle);
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to create I2C master bus: %s", esp_err_to_name(ret));
     }
 
-    // Initialize INA219 current/voltage sensor
-    if (ina219_init(bus_handle) != ESP_OK) {
-        ESP_LOGE(TAG, "INA219 initialization failed");
+    if (bus_handle != NULL) {
+        // Initialize INA219 current/voltage sensor
+        if (ina219_init(bus_handle) != ESP_OK) {
+            ESP_LOGW(TAG, "INA219 initialization failed - electrical measurements disabled");
+        }
+
+        // Initialize OLED display
+        esp_lcd_panel_io_handle_t io_handle = NULL;
+        esp_lcd_panel_io_i2c_config_t io_config = {
+            .dev_addr = TEST_I2C_DEV_ADDR,
+            .scl_speed_hz = TEST_LCD_PIXEL_CLOCK_HZ,
+            .control_phase_bytes = 1, // According to SSD1306 datasheet
+            .dc_bit_offset = 6,       // According to SSD1306 datasheet
+            .lcd_cmd_bits = 8,        // According to SSD1306 datasheet
+            .lcd_param_bits = 8,      // According to SSD1306 datasheet
+        };
+
+        ret = esp_lcd_new_panel_io_i2c(bus_handle, &io_config, &io_handle);
+        if (ret == ESP_OK && io_handle != NULL) {
+            esp_lcd_panel_handle_t panel_handle = NULL;
+            esp_lcd_panel_dev_config_t panel_config = {
+                .bits_per_pixel = 1,
+                .reset_gpio_num = -1,
+            };
+            ret = esp_lcd_new_panel_ssd1306(io_handle, &panel_config, &panel_handle);
+            if (ret == ESP_OK && panel_handle != NULL) {
+                esp_lcd_panel_reset(panel_handle);
+                esp_lcd_panel_init(panel_handle);
+                esp_lcd_panel_disp_on_off(panel_handle, true);
+                esp_lcd_panel_mirror(panel_handle, true, true);
+
+                gfx_init(panel_handle, TEST_LCD_H_RES, TEST_LCD_V_RES);
+
+                gfx_clear_area(0, 0, 128, 64);
+                gfx_draw_text(0, 0, "Beer warmer");
+                gfx_flush();
+            } else {
+                ESP_LOGW(TAG, "SSD1306 panel init failed - display disabled");
+            }
+        } else {
+            ESP_LOGW(TAG, "OLED panel IO init failed - display disabled");
+        }
+    } else {
+        ESP_LOGW(TAG, "I2C bus unavailable - INA219 and OLED disabled");
     }
-
-    esp_lcd_panel_io_handle_t io_handle = NULL;
-    esp_lcd_panel_io_i2c_config_t io_config = {
-        .dev_addr = TEST_I2C_DEV_ADDR,
-        .scl_speed_hz = TEST_LCD_PIXEL_CLOCK_HZ,
-        .control_phase_bytes = 1, // According to SSD1306 datasheet
-        .dc_bit_offset = 6,       // According to SSD1306 datasheet
-        .lcd_cmd_bits = 8,        // According to SSD1306 datasheet
-        .lcd_param_bits = 8,      // According to SSD1306 datasheet
-    };
-
-    esp_lcd_new_panel_io_i2c(bus_handle, &io_config, &io_handle);
-
-    esp_lcd_panel_handle_t panel_handle = NULL;
-    esp_lcd_panel_dev_config_t panel_config = {
-        .bits_per_pixel = 1,
-        .reset_gpio_num = -1,
-    };
-    esp_lcd_new_panel_ssd1306(io_handle, &panel_config, &panel_handle);
-    esp_lcd_panel_reset(panel_handle);
-    esp_lcd_panel_init(panel_handle);
-    // turn on display
-    esp_lcd_panel_disp_on_off(panel_handle, true);
-
-    // mirror the display
-    esp_lcd_panel_mirror(panel_handle, true, true);
-
-    gfx_init(panel_handle, TEST_LCD_H_RES, TEST_LCD_V_RES);
-
-    gfx_clear_area(0, 0, 128, 64);
-    gfx_draw_text(0, 0, "Beer warmer");
-    gfx_flush();
 
     // task for keeping track of temperature
     xTaskCreate(temp_task, "temp_task", 4096, NULL, 5, NULL);

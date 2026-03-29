@@ -16,7 +16,10 @@ static const char *TAG = "INA219";
 #define CAL_VALUE    0x7FF8  // Calibration for 2A range
 #define CURRENT_LSB  0.00006257f  // 62.57 uA per LSB
 
+#define I2C_TIMEOUT_MS 100
+
 static i2c_master_dev_handle_t dev_handle = NULL;
+static bool ina219_initialized = false;
 
 static esp_err_t write_reg(uint8_t reg, uint16_t value)
 {
@@ -25,13 +28,13 @@ static esp_err_t write_reg(uint8_t reg, uint16_t value)
         (uint8_t)(value >> 8),
         (uint8_t)(value & 0xFF)
     };
-    return i2c_master_transmit(dev_handle, buf, sizeof(buf), -1);
+    return i2c_master_transmit(dev_handle, buf, sizeof(buf), I2C_TIMEOUT_MS);
 }
 
 static esp_err_t read_reg(uint8_t reg, uint16_t *value)
 {
     uint8_t buf[2];
-    esp_err_t ret = i2c_master_transmit_receive(dev_handle, &reg, 1, buf, 2, -1);
+    esp_err_t ret = i2c_master_transmit_receive(dev_handle, &reg, 1, buf, 2, I2C_TIMEOUT_MS);
     if (ret == ESP_OK) {
         *value = (buf[0] << 8) | buf[1];
     }
@@ -66,12 +69,19 @@ esp_err_t ina219_init(i2c_master_bus_handle_t bus_handle)
         return ret;
     }
 
+    ina219_initialized = true;
     ESP_LOGI(TAG, "Initialized successfully");
     return ESP_OK;
 }
 
+bool ina219_available(void)
+{
+    return ina219_initialized;
+}
+
 float ina219_read_voltage(void)
 {
+    if (!ina219_initialized) return 0.0f;
     uint16_t raw;
     if (read_reg(REG_BUS_VOLTAGE, &raw) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read voltage");
@@ -83,6 +93,7 @@ float ina219_read_voltage(void)
 
 float ina219_read_current(void)
 {
+    if (!ina219_initialized) return 0.0f;
     uint16_t raw;
     if (read_reg(REG_CURRENT, &raw) != ESP_OK) {
         ESP_LOGE(TAG, "Failed to read current");

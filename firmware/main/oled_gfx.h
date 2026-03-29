@@ -1,4 +1,5 @@
 
+#include <stdbool.h>
 #include "esp_lcd_panel_io.h"
 #include "esp_lcd_panel_vendor.h"
 #include "esp_lcd_panel_ops.h"
@@ -18,5 +19,6 @@ void gfx_draw_text(int x, int y, const char *text);
 void gfx_clear_area(int x, int y, int w, int h);
 void gfx_fill_area(int x, int y, int w, int h);
 void gfx_set_pixel(uint8_t x, uint8_t y);
+bool gfx_available(void);
 void gfx_flush();
 void gfx_clear_pixel(uint8_t x, uint8_t y);

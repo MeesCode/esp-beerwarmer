@@ -1,5 +1,6 @@
 #pragma once
 
+#include <stdbool.h>
 #include "esp_err.h"
 #include "driver/i2c_master.h"
 
@@ -11,6 +12,12 @@
  * @return ESP_OK on success
  */
 esp_err_t ina219_init(i2c_master_bus_handle_t bus_handle);
+
+/**
+ * @brief Check if INA219 was initialized successfully
+ * @return true if available
+ */
+bool ina219_available(void);
 
 /**
  * @brief Read the bus voltage
